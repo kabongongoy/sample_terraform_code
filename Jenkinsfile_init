@@ -1,0 +1,55 @@
+pipeline {
+    agent none
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '2'))
+    }
+    stages {
+        stage('checkout & plan') {
+            agent {
+                kubernetes {
+                    yaml '''
+                    apiVersion: v1
+                    kind: Pod
+                    metadata:
+                        labels:
+                            app: test
+                    spec:
+                        containers:
+                        - name: terraform
+                          image: hashicorp/terraform
+                          command:
+                          - cat
+                          tty: true
+                    '''
+                    podRetention never()
+                }
+            }
+            stages {
+                stage('checkout scm') {
+                    steps {
+                        git branch: 'main', credentialsId: 'github_creds', url: 'https://github.com/kabongongoy/sample_terraform_code.git'
+                    }
+                }
+                stage('terraform init') {
+                    steps {
+                        container('terraform') {
+                            withCredentials([usernamePassword(credentialsId: 'aws_creds', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                                sh 'terraform init'
+                            }
+                        }
+                    }
+                }
+                stage('terraform plan') {
+                    steps {
+                        container('terraform') {
+                            withCredentials([usernamePassword(credentialsId: 'aws_creds', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                                sh 'terraform plan -no-color'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

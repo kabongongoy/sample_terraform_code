@@ -1,0 +1,27 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+            apiVersion: v1
+            kind: Pod
+            metadata:
+                labels:
+                    app: test
+            spec:
+                containers: []
+            '''
+            podRetention never()
+        }
+    }
+    options {
+        timeout(time: 10, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '2'))
+    }
+    stages {
+        stage('checkout scm') {
+            steps {
+                git branch: 'main', credentialsId: 'github_creds', url: 'https://github.com/kabongongoy/sample_terraform_code.git'
+            }
+        }
+    }
+}
